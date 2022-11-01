@@ -36,6 +36,10 @@ dependencies:
   http: ^0.13.3
   group_radio_button: ^1.2.0
   rounded_loading_button: ^2.1.0
+  firebase_core: ^1.2.0
+  overlay_support: ^1.2.1
+  firebase_core_platform_interface: 4.5.1
+  firebase_messaging: ^13.0.4 # will satisfy your firebase core things that depend on ^4.5.1
 
 
   # The following adds the Cupertino Icons font to your application.
