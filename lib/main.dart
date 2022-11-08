@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:group_radio_button/group_radio_button.dart';
 import 'package:rounded_loading_button/rounded_loading_button.dart';
 import 'package:hizli_tren/notification.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -128,6 +129,7 @@ class _HomePage extends State<HomePage> {
       print(value);
 
     });
+
     notificationObj.initializeClass();
   }
 
@@ -139,7 +141,7 @@ class _HomePage extends State<HomePage> {
   }
 
   Future<http.Response> registerResponse() async{
-    return http.post(Uri.parse('https://balkan-tren.herokuapp.com/register?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate&sefer=$selectedSefer'),headers: {
+    return http.post(Uri.parse('https://balkan-tren.herokuapp.com/register?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate&sefer=$selectedSefer&token=$token'),headers: {
       "Accept": "application/json",
       "Access-Control_Allow_Origin": "*"}
     );
@@ -405,7 +407,7 @@ class _HomePage extends State<HomePage> {
                 {
                   print("$_verticalGroupValue seferine kayıtlanıldı");
                   setState(() {
-                   _status[_status.indexOf(_verticalGroupValue)] = "$_verticalGroupValue seferine kayıtlanıldı";
+                   _status[_status.indexOf(_verticalGroupValue)] = "$_verticalGroupValue kayıtlanıldı";
                    selectedSefer = _verticalGroupValue;
                    registerResponse();
                   });

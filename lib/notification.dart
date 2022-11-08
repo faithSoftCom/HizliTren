@@ -3,12 +3,17 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:hizli_tren/model/push_notification.dart';
 import 'package:overlay_support/overlay_support.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+
+
+
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("Handling a background message: ${message.messageId}");
 }
 
-
+String? token='';
 
 
 class NotificationClass {
@@ -20,6 +25,19 @@ class NotificationClass {
     await Firebase.initializeApp();
     _messaging = FirebaseMessaging.instance;
 
+    try {
+      final userCredential =
+      await FirebaseAuth.instance.signInAnonymously();
+      print("Signed in with temporary account.");
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case "operation-not-allowed":
+          print("Anonymous auth hasn't been enabled for this project.");
+          break;
+        default:
+          print("Unknown error.");
+      }
+    }
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     NotificationSettings settings = await _messaging.requestPermission(
@@ -72,7 +90,7 @@ class NotificationClass {
     await Firebase.initializeApp();
     RemoteMessage? initialMessage =
     await FirebaseMessaging.instance.getInitialMessage();
-    String? token = await FirebaseMessaging.instance.getToken();
+    token = await FirebaseMessaging.instance.getToken();
     print("FirebaseMessaging token: $token");
 
     if (initialMessage != null) {
