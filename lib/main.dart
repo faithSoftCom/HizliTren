@@ -7,10 +7,47 @@ import 'package:http/http.dart' as http;
 import 'package:group_radio_button/group_radio_button.dart';
 import 'package:rounded_loading_button/rounded_loading_button.dart';
 import 'package:hizli_tren/notification.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'dart:math';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter/material.dart';
+
 
 void main() {
+
+  WidgetsFlutterBinding.ensureInitialized();
+  MobileAds.instance.initialize();
   runApp(MyApp());
 }
+
+class Sefer{
+
+  final String date;
+  final String binis;
+  final String inis;
+  final String hour;
+  final String vacancy;
+
+  const Sefer({
+    required this.date,
+    required this.binis,
+    required this.inis,
+    required this.hour,
+    required this.vacancy
+  });
+
+  factory Sefer.fromJson( dynamic json) {
+    return Sefer(
+      date: json['date'] as String,
+      binis: json['binis'] as String,
+      inis: json['inis'] as String,
+      hour: json['hour'] as String,
+      vacancy: json['vacancy'] as String,
+    );
+  }
+
+}
+
 
 class TrenVacancies {
   final String saat;
@@ -28,6 +65,13 @@ class TrenVacancies {
     );
   }
 }
+List<dynamic> getTrenDates(String responseBody)
+{
+  var data = json.decode(responseBody);
+  var rest = data["registeredList"] ;
+  final List  dataList = jsonDecode(rest);
+  return dataList;
+}
 
 List<String> getTrenVacanices(String responseBody)
 {
@@ -44,37 +88,59 @@ List<String> getTrenHours(String responseBody)
 
   return tags;
 }
-List<String> getRadioButtons(String responseBody)
-{
-  List<String>hours= getTrenHours(responseBody);
-  List<String>vacancies= getTrenVacanices(responseBody);
-  List<String> returnList=[];
-  for(int i=0;i<hours.length;i++)
-    {
-      returnList.add(hours[i]+'  /  '+vacancies[i]);
-    }
-  return returnList;
-}
+
 
 
 class MyApp extends StatelessWidget {
+
+
+
+
   @override
   Widget build(BuildContext context) {
+
     return MaterialApp(
-      title: "Date Picker",
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: [
+        const Locale('en'),
+        const Locale('tr')
+      ],
+      title: "Hızlı Tren",
       home: HomePage(),
     );
   }
+
+
 }
 
 class HomePage extends StatefulWidget {
+
+
+
   @override
   State<StatefulWidget> createState() {
     return _HomePage();
   }
 }
 
+const int maxFailedLoadAttempts = 3;
 class _HomePage extends State<HomePage> {
+  static final AdRequest request = AdRequest(
+    keywords: <String>['foo', 'bar'],
+    contentUrl: 'http://foo.com/bar.html',
+    nonPersonalizedAds: true,
+  );
+
+
+  RewardedAd? _rewardedAd;
+  int _numRewardedLoadAttempts = 0;
+
+
+
   TextEditingController dateInput = TextEditingController();
   NotificationClass notificationObj= NotificationClass();
   final List<String> items = [
@@ -106,7 +172,7 @@ class _HomePage extends State<HomePage> {
   String? selectedInis;
   String formattedDate= "";
   String results= "";
-  static const urlPrefix = 'https://balkan-tren.herokuapp.com/locations';
+  static const urlPrefix = /*"http://192.168.1.39:5000/locations";*/'https://jellyfish-app-2-sovid.ondigitalocean.app//locations';
   late Future<http.Response> futureAlbum ;
   final RoundedLoadingButtonController _btnController1 = RoundedLoadingButtonController();
   final RoundedLoadingButtonController _btnController2 = RoundedLoadingButtonController();
@@ -120,30 +186,185 @@ class _HomePage extends State<HomePage> {
   bool _isVisible = false;
   bool isLoading=false;
   String selectedSefer="";
+  List<dynamic> registeredSefers =[];
+
+
+
+
+  void _createRewardedAd() {
+    RewardedAd.load(
+        adUnitId: 'ca-app-pub-9960452145091971/5525849378',
+        request: request,
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (RewardedAd ad) {
+            print('$ad loaded.');
+            _rewardedAd = ad;
+            _numRewardedLoadAttempts = 0;
+          },
+          onAdFailedToLoad: (LoadAdError error) {
+            print('RewardedAd failed to load: $error');
+            _rewardedAd = null;
+            _numRewardedLoadAttempts += 1;
+            if (_numRewardedLoadAttempts < maxFailedLoadAttempts) {
+              _createRewardedAd();
+            }
+          },
+        ));
+  }
+
+  void _showRewardedAd() {
+    if (_rewardedAd == null) {
+      print('Warning: attempt to show rewarded before loaded.');
+      return;
+    }
+    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (RewardedAd ad) =>
+          print('ad onAdShowedFullScreenContent.'),
+      onAdDismissedFullScreenContent: (RewardedAd ad) {
+        print('$ad onAdDismissedFullScreenContent.');
+        ad.dispose();
+        _createRewardedAd();
+      },
+      onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
+        print('$ad onAdFailedToShowFullScreenContent: $error');
+        ad.dispose();
+        _createRewardedAd();
+      },
+    );
+
+    _rewardedAd!.setImmersiveMode(true);
+    _rewardedAd!.show(
+        onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+          print('$ad with reward $RewardItem(${reward.amount}, ${reward.type})');
+        });
+    _rewardedAd = null;
+  }
+
+
+
+  @override
+  void dispose() {
+    super.dispose();
+    _rewardedAd?.dispose();
+  }
+
 
   @override
   void initState() {
+
+
     dateInput.text = ""; //set the initial value of text field
     super.initState();
     _btnController1.stateStream.listen((value) {
       print(value);
 
     });
+    const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
+    Random _rnd = Random();
+
+    String getRandomString(int length) => String.fromCharCodes(Iterable.generate(
+        length, (_) => _chars.codeUnitAt(_rnd.nextInt(_chars.length))));
+    _createRewardedAd();
+    final myFuture = fetchUserInfo();
+
+    myFuture.then((response) {
+      if (response.statusCode == 200) {
+
+        registeredSefers = getTrenDates(response.body);
+        var sefers = (registeredSefers[0]);
+         //print(response.body);
+      }
+    });
+
 
     notificationObj.initializeClass();
   }
 
+  List<String> getRadioButtons(String responseBody)
+  {
+    List<String>hours= getTrenHours(responseBody);
+    List<String>vacancies= getTrenVacanices(responseBody);
+    List<String> returnList=[];
+    for(int i=0;i<hours.length;i++)
+    {
+
+      if(checkIfPreviouslyReceived(formattedDate,hours[i]))
+        {
+          returnList.add(hours[i]+'  /  '+vacancies[i] + " kayıtlanıldı");
+        }
+      else
+        {
+          returnList.add(hours[i]+'  /  '+vacancies[i]);
+        }
+
+    }
+    return returnList;
+  }
+
+
+
+  bool checkIfPreviouslyReceived(String prevDate, String prevHour)
+  {
+    for (var i=0; i < registeredSefers.length; i++) {
+      var sefers = (registeredSefers[i]);
+      print("check:"+prevDate+ "**"+sefers['Sefer']['date']+prevHour+ "**"+sefers['Sefer']['hour']+"---");
+      if((sefers['Sefer']['date'].compareTo(prevDate)==0) && (sefers['Sefer']['hour'].contains(prevHour)))
+        {
+          print("Daha once bu sefere kayıtlanilmis");
+          return true;
+        }
+    }
+    return false;
+  }
+
   Future<http.Response> fetchAlbum() async{
-    return http.post(Uri.parse('https://balkan-tren.herokuapp.com/trainHours?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate'),headers: {
+    //return http.post(Uri.parse('http://192.168.1.39:5000/trainHours?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate'),headers: {
+    return http.post(Uri.parse('https://jellyfish-app-2-sovid.ondigitalocean.app/trainHours?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate'),headers: {
       "Accept": "application/json",
       "Access-Control_Allow_Origin": "*"}
     );
   }
 
   Future<http.Response> registerResponse() async{
-    return http.post(Uri.parse('https://balkan-tren.herokuapp.com/register?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate&sefer=$selectedSefer&token=$token'),headers: {
+    //return http.post(Uri.parse('http://192.168.1.39:5000/register?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate&sefer=$selectedSefer&token=$token'),headers: {
+    return http.post(Uri.parse('https://jellyfish-app-2-sovid.ondigitalocean.app/register?first_location=$selectedBinis&last_location=$selectedInis&date=$formattedDate&sefer=$selectedSefer&token=$token'),headers: {
       "Accept": "application/json",
       "Access-Control_Allow_Origin": "*"}
+    );
+  }
+
+  Future<http.Response> fetchUserInfo() async{
+    //return http.post(Uri.parse('http://192.168.1.39:5000/getUserInfo?tokenId=$token'),headers: {
+      return http.post(Uri.parse('https://jellyfish-app-2-sovid.ondigitalocean.app/getUserInfo?tokenId=$token'),headers: {
+      "Accept": "application/json",
+      "Access-Control_Allow_Origin": "*"}
+    );
+  }
+  showAlertDialog(BuildContext context) {
+
+    // set up the button
+    Widget okButton = TextButton(
+      child: Text("Tamam"),
+      onPressed: () {
+        Navigator.of(context).pop();
+      },
+    );
+
+    // set up the AlertDialog
+    AlertDialog alert = AlertDialog(
+      title: Text("Tekrar Deneyiniz"),
+      content: Text("TCDD Sitesi Hata Döndü"),
+      actions: [
+        okButton,
+      ],
+    );
+
+    // show the dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return alert;
+      },
     );
   }
 
@@ -170,6 +391,7 @@ class _HomePage extends State<HomePage> {
               onTap: () async {
                 DateTime? pickedDate = await showDatePicker(
                     context: context,
+                    locale: const Locale("tr", "TR"),
                     initialDate: DateTime.now(),
                     firstDate: DateTime(1950),
                     //DateTime.now() - not to allow to choose before today.
@@ -358,18 +580,26 @@ class _HomePage extends State<HomePage> {
                 setState(() {
                   isLoading = true;
                 });
+
                 final myFuture = fetchAlbum();
 
                 myFuture.then((response) {
                   _btnController1.reset();
                   if (response.statusCode == 200) {
-                    // print(response.body);
-                    setState(() {
-                      results = response.body;
-                      _status = getRadioButtons(response.body);
-                      _isVisible = true;
-                    });
-
+                    List<String> testList= getTrenHours(response.body);
+                    if(testList.length==0)
+                      {
+                        print('TCDD Sitesi Hata >Döndü, Lütfen Tekrar Deneyiniz');
+                        showAlertDialog(context);
+                      }
+                    else
+                      {
+                        setState(() {
+                          results = response.body;
+                          _status = getRadioButtons(response.body);
+                          _isVisible = true;
+                        });
+                      }
                   }
                 });
                 setState(() {
@@ -403,8 +633,8 @@ class _HomePage extends State<HomePage> {
 
                 child: Text('Seferdeki Değişikliklere Kayıtlan', style: TextStyle(color: Colors.white)),
                 controller: _btnController2,
-                onPressed: ()
-                {
+                onPressed: (){
+                  _showRewardedAd();
                   print("$_verticalGroupValue seferine kayıtlanıldı");
                   setState(() {
                    _status[_status.indexOf(_verticalGroupValue)] = "$_verticalGroupValue kayıtlanıldı";
@@ -414,11 +644,14 @@ class _HomePage extends State<HomePage> {
                   _btnController2.reset();
                 },
               ),
-            )
+            ),
+
 
           ],
-        )
+        ),
+
 
         );
   }
+
 }
